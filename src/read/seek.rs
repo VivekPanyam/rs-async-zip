@@ -79,16 +79,17 @@ where
 
     /// Returns a new entry reader if the provided index is valid.
     /// Consumes self
-    pub async fn into_entry(mut self, index: usize) -> Result<ZipEntryReader<'static, R>>
+    pub async fn into_entry(self, index: usize) -> Result<ZipEntryReader<'static, R>>
     where
         R: 'static,
     {
         let stored_entry = self.file.entries.get(index).ok_or(ZipError::EntryIndexOutOfBounds)?;
-        let seek_to = stored_entry.data_offset();
+        let mut reader = BufReader::new(self.reader);
 
-        self.reader.seek(SeekFrom::Start(seek_to)).await?;
+        stored_entry.seek_to_data_offset(&mut reader).await?;
+
         Ok(ZipEntryReader::new_with_owned(
-            self.reader,
+            reader,
             stored_entry.entry.compression(),
             stored_entry.entry.uncompressed_size().into(),
         ))
